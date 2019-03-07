@@ -48,7 +48,9 @@ wrangled <- all_rankings_next %>%
   mutate(top = case_when(is.element(episode_placement, c('HIGH', 'WIN', 'Winner')) ~ 1,
                       TRUE ~ 0)) %>%
   mutate(bottom = case_when(is.element(episode_placement, c('BTM2', 'LOW')) ~ 1,
-                      TRUE ~ 0)) %>%                                           
+                      TRUE ~ 0)) %>%     
+  mutate(safe = case_when(is.element(episode_placement, c('SAFE')) ~ 1,
+                      TRUE ~ 0)) %>%                                       
   group_by(t) %>% mutate(num_winners = sum(placement == 1), 
                          num_losers = sum(placement == -1)) %>% 
   arrange(desc(placement), .by_group = TRUE) %>% ungroup() %>% # within episode: winner first, loser last
@@ -60,17 +62,16 @@ wrangled <- all_rankings_next %>%
     mutate(past_lipsync = cumsum(lipsync == 1) - (lipsync == 1)) %>%
     mutate(past_top = cumsum(top == 1) - (top == 1)) %>%
     mutate(past_bottom = cumsum(bottom == 1) - (bottom == 1)) %>%
-    #mutate(past_lipsync = cumsum(episode_placement == "BTM2") - (episode_placement == "BTM2")) %>%
-    #mutate(past_top = cumsum(episode_placement == "HIGH") - (episode_placement == "HIGH")) %>%
-    #mutate(past_bottom = cumsum(episode_placement == "BTM2" | episode_placement == "LOW") - (episode_placement == "BTM2" | episode_placement == "LOW")) %>%
+    mutate(past_safe = cumsum(safe == 1) - (safe == 1)) %>%
   ungroup() %>%
   mutate(z.past_wins = (past_wins - mean(past_wins))/(2*sd(past_wins))) %>%
   mutate(z.past_lipsync = (past_lipsync - mean(past_lipsync, na.rm = TRUE))/(2*sd(past_lipsync, na.rm = TRUE))) %>%
   mutate(z.past_top = (past_top - mean(past_top, na.rm = TRUE))/(2*sd(past_top, na.rm = TRUE))) %>%
   mutate(z.past_bottom = (past_bottom - mean(past_bottom, na.rm = TRUE))/(2*sd(past_bottom, na.rm = TRUE))) %>%
+  mutate(z.past_safe = (past_safe - mean(past_safe, na.rm = TRUE))/(2*sd(past_safe, na.rm = TRUE))) %>%
   mutate(z.age = (age - mean(age))/(2*sd(age))) %>%
   select(season_number, episode_number, t, contestant_id, contestant_name, # identifiers
-         ethnicity, asian, black, latino, white, z.age, z.past_wins, z.past_lipsync, z.past_top, z.past_bottom, plus_size, drag_house_ind, drag_fam_competed, puerto_rican, new_york_city, # x variables
+         ethnicity, asian, black, latino, white, z.age, z.past_wins, z.past_lipsync, z.past_top, z.past_safe, z.past_bottom, plus_size, drag_house_ind, drag_fam_competed, puerto_rican, new_york_city, # x variables
          placement, num_winners, num_losers) # episode outcomes
 # renumber episodes skipping the atypical ones:
 wrangled$t <- as.numeric(as.factor(wrangled$t))
