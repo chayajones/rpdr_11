@@ -112,7 +112,7 @@ data {
   // vector[N] black;
   vector[N] latino;
   // vector[N] white;
-  vector[N] puerto_rican;
+  // vector[N] puerto_rican;
   // vector[N] new_york_city;
   vector[N] drag_house_ind;
   // vector[N] past_lipsync;
@@ -128,7 +128,7 @@ parameters {
   // real beta_black;
   real beta_latino;
   // real beta_white;
-  real beta_puerto_rican;
+  // real beta_puerto_rican;
   // real beta_new_york_city;
   real beta_drag_house_ind;
   // real beta_past_lipsync;
@@ -143,7 +143,7 @@ transformed parameters {
 }
 model {
   // vector[N] eta = beta_age * age + beta_past_wins * past_wins + alpha_contestant[ii];
-  vector[N] eta = beta_asian * asian + beta_latino * latino + beta_puerto_rican * puerto_rican + beta_drag_house_ind * drag_house_ind + beta_past_top * past_top + beta_past_bottom * past_bottom + alpha_contestant[ii];
+  vector[N] eta = beta_asian * asian + beta_latino * latino + beta_drag_house_ind * drag_house_ind + beta_past_top * past_top + beta_past_bottom * past_bottom + alpha_contestant[ii];
   // beta_age ~ student_t(6,0,2.5);
   // beta_plus_size ~ student_t(6,0,2.5);
   // beta_drag_fam_competed ~ student_t(6,0,2.5);
@@ -151,7 +151,7 @@ model {
   // beta_black ~ student_t(6,0,2.5);
   beta_latino ~ student_t(6,0,2.5);
   // beta_white ~ student_t(6,0,2.5);
-  beta_puerto_rican ~ student_t(6,0,2.5);
+  // beta_puerto_rican ~ student_t(6,0,2.5);
   // beta_new_york_city ~ student_t(6,0,2.5);
   beta_drag_house_ind ~ student_t(6,0,2.5);
   // beta_past_lipsync ~ student_t(6,0,2.5);
@@ -185,7 +185,7 @@ fit_model <- function(df) {
     # black = df$black,
     latino = df$latino,
     # white = df$white,
-    puerto_rican = df$puerto_rican,
+    # puerto_rican = df$puerto_rican,
     # new_york_city = df$new_york_city,
     drag_house_ind = df$drag_house_ind,
     # past_lipsync = df$z.past_lipsync,
@@ -199,8 +199,8 @@ data_so_far <- wrangled %>% filter(t < next_t)
 fit <- fit_model(df = data_so_far)
 ```
 ```{r stan_plot}
-print(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_puerto_rican', 'beta_past_top', 'beta_past_bottom', 'sigma'))
-stan_plot(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_puerto_rican', 'beta_past_top', 'beta_past_bottom', 'sigma')) + geom_vline(xintercept=0, size = 2)
+print(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_past_top', 'beta_past_bottom', 'sigma'))
+stan_plot(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_past_top', 'beta_past_bottom', 'sigma')) + geom_vline(xintercept=0, size = 2)
 ```
 To estimate the predictive performance for new episodes we use *leave-future-out cross-validation*:
 
@@ -227,7 +227,7 @@ for (t_current in (L+1):(next_t - 1)) {
     } else { # this is a new contestant
       alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
     }
-    eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_puerto_rican * newdata$puerto_rican[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
+    eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
   }
   winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
   pred_winner <- Mode(winner_s)
@@ -258,7 +258,7 @@ for (n in 1:nrow(newdata)) {
   } else { # this is a new contestant
     alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
   }
-  eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_puerto_rican * newdata$puerto_rican[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
+  eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
 }
 winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
 pred_winner <- Mode(winner_s)

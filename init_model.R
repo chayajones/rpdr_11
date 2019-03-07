@@ -372,6 +372,18 @@ losefit15 <- glm(placement ~ asian + latino + drag_house_ind + puerto_rican + z.
 summary(losefit15)
 anova(losefit15, test = "Chisq")
 
+winfit16 <- glm(placement ~ asian + latino + drag_house_ind + z.past_bottom + z.past_top, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit16)
+anova(winfit16, test = "Chisq")
+
+losefit16 <- glm(placement ~ asian + latino + drag_house_ind + z.past_bottom + z.past_top, family = binomial(link = "logit"),
+    data = losers)
+
+summary(losefit16)
+anova(losefit16, test = "Chisq")
+
 
 # next things to consider adding: cumsum of being in the bottom 2 (lip sync w/o getting out) (BTM2), cumsum of being in the top w/o winning (HIGH), 
 # cumsum of being in the bottom (bottom 3) w/o losing (BTM2 or LOW), cumsum of being in the top or winning (HIGH or WIN)
