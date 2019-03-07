@@ -1,0 +1,269 @@
+---
+title: "RPDR"
+author: "Chaya Jones"
+date: "March 4, 2019"
+output: html_document
+---
+
+---
+## R Setup
+
+```{r setup, message = FALSE, warning = FALSE}
+library(tidyverse)
+library(knitr)
+library(googlesheets)
+library(rstan)
+knitr::dep_prev()
+```
+
+## Wrangle
+
+We begin by data wrangling, getting data into R in a useful form. We import and join datasets. We standardize continuous variables (see [this paper](http://www.stat.columbia.edu/~gelman/research/published/standardizing7.pdf)).
+
+```{r wrangled, message = FALSE, warning = FALSE, cache = TRUE}
+gs_auth()
+rpdr_data <- "16z2UvQB6CQqc1jrqlpTBn-gOkelklB586qRJ47XMWIM" %>%  gs_key
+all_episodes <- rpdr_data %>% gs_read("all_episodes")
+all_contestants <- rpdr_data %>% gs_read("all_contestants")
+all_rankings <- rpdr_data %>% gs_read("all_rankings")
+#--------------------- add next episode to predict ---------------------#
+all_episodes_next <- add_row(all_episodes, season_number = 11, episode_number = 2,
+                             episode_airdate = NA, episode_title = NA,
+                             episode_type = "Competition", episode_maxi_challenge_type = NA) %>% 
+  arrange(season_number, episode_number) %>% rowid_to_column("t")
+season_11_contestants <- (all_contestants %>% filter(season_number == 11))$contestant_id
+eliminated_contestants <- (all_rankings %>% filter(is.element(episode_placement,c('ELIM','Eliminated'))))$contestant_id
+next_contestants <- setdiff(season_11_contestants, eliminated_contestants)
+all_rankings_next <- add_row(all_rankings, season_number = 11, episode_number = 2, 
+                             contestant_id = next_contestants, episode_placement = NA)
+#-----------------------------------------------------------------------#
+wrangled <- all_rankings_next %>%
+  left_join(all_contestants, by = c("season_number","contestant_id")) %>%
+  left_join(all_episodes_next, by=c("season_number", "episode_number")) %>%
+  mutate(placement = case_when(is.element(episode_placement,c('WIN','Winner')) ~ 1,
+                      is.element(episode_placement,c('ELIM','Eliminated'))  ~ -1,
+                      TRUE ~ 0)) %>%
+  mutate(lipsync = case_when(is.element(episode_placement, c('BTM2')) ~ 1,
+                      TRUE ~ 0)) %>%
+  mutate(top = case_when(is.element(episode_placement, c('HIGH', 'WIN', 'Winner')) ~ 1,
+                      TRUE ~ 0)) %>%
+  mutate(bottom = case_when(is.element(episode_placement, c('BTM2', 'LOW')) ~ 1,
+                      TRUE ~ 0)) %>%                                           
+  group_by(t) %>% mutate(num_winners = sum(placement == 1), 
+                         num_losers = sum(placement == -1)) %>% 
+  arrange(desc(placement), .by_group = TRUE) %>% ungroup() %>% # within episode: winner first, loser last
+  filter(is.element(episode_type,c('Competition','Finale'))) %>%
+  filter((num_winners == 1 & num_losers == 1) | t == max(t)) %>% # use data on typical episodes
+  filter(!is.element(episode_placement,c('Guest','Miss C')) | t == max(t)) %>% # use data on typical contestants
+  group_by(contestant_id) %>% 
+    mutate(past_wins = cumsum(placement == 1) - (placement == 1)) %>%
+    mutate(past_lipsync = cumsum(lipsync == 1) - (lipsync == 1)) %>%
+    mutate(past_top = cumsum(top == 1) - (top == 1)) %>%
+    mutate(past_bottom = cumsum(bottom == 1) - (bottom == 1)) %>%
+    #mutate(past_lipsync = cumsum(episode_placement == "BTM2") - (episode_placement == "BTM2")) %>%
+    #mutate(past_top = cumsum(episode_placement == "HIGH") - (episode_placement == "HIGH")) %>%
+    #mutate(past_bottom = cumsum(episode_placement == "BTM2" | episode_placement == "LOW") - (episode_placement == "BTM2" | episode_placement == "LOW")) %>%
+  ungroup() %>%
+  mutate(z.past_wins = (past_wins - mean(past_wins))/(2*sd(past_wins))) %>%
+  mutate(z.past_lipsync = (past_lipsync - mean(past_lipsync, na.rm = TRUE))/(2*sd(past_lipsync, na.rm = TRUE))) %>%
+  mutate(z.past_top = (past_top - mean(past_top, na.rm = TRUE))/(2*sd(past_top, na.rm = TRUE))) %>%
+  mutate(z.past_bottom = (past_bottom - mean(past_bottom, na.rm = TRUE))/(2*sd(past_bottom, na.rm = TRUE))) %>%
+  mutate(z.age = (age - mean(age))/(2*sd(age))) %>%
+  select(season_number, episode_number, t, contestant_id, contestant_name, # identifiers
+         ethnicity, asian, black, latino, white, z.age, z.past_wins, z.past_lipsync, z.past_top, z.past_bottom, plus_size, drag_house_ind, drag_fam_competed, puerto_rican, new_york_city, # x variables
+         placement, num_winners, num_losers) # episode outcomes
+# renumber episodes skipping the atypical ones:
+wrangled$t <- as.numeric(as.factor(wrangled$t))
+next_t = max(wrangled$t)
+```
+
+Our wrangled data look like this:
+```{r view1_wrangled, message = FALSE, warning = FALSE, echo = FALSE, cache = TRUE}
+kable(wrangled %>% filter(t == min(t)), digits = 2)
+```
+...
+...
+...
+```{r view2_wrangled, message = FALSE, warning = FALSE, echo = FALSE, cache = TRUE}
+kable(wrangled %>% filter(t == max(t)), digits = 2)
+```
+
+## Model
+
+Now that we wrangled our data, we can model. Let $i$ index the contestants and $t$ index the episodes. We fit a [multilevel](http://www.stat.columbia.edu/~gelman/arm/), [conditional logistic](https://en.wikipedia.org/wiki/Conditional_logistic_regression) regression model with age, past wins, and a coefficient for each contestant. Here is our model in mathematical notation: 
+
+$$\eta_{it} = \beta_\text{age} \text{age}_i + \beta_\text{past_wins} \text{past_wins}_{it} + \alpha_i \ \ \text{ for } i \text{ playing in episode } t$$
+
+$$P[i^* \text{ wins episode }t] = \frac{\exp(\eta_{i^*t})}{\sum_i \exp(\eta_{it})}$$
+$$P[i_* \text{ loses episode }t] = \frac{\exp(-\eta_{i_*t})}{\sum_{i \ne i^*} \exp(-\eta_{it})}$$
+$$\alpha_i \sim N(0, \sigma)$$
+We have [prior knowledge from large corpuses of logistic regressions](http://www.stat.columbia.edu/~gelman/research/published/priors11.pdf) to rule out unreasonable values for coefficients. We express this by putting a Student's t prior on $\beta_\text{age}$ and $\beta_\text{past_wins}$. This is a reasonable default prior when coefficients should be close to zero but have some chance of being large. We put a half-Normal prior on $\sigma$. We follow the recommendations [here](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations).
+```{stan, output.var='model', cache = TRUE}
+data {
+  int N; // number of contestant-episode observations
+  int I; // number of contestants
+  int T; // number of episodes
+  int<lower=1,upper=I> ii[N]; // contestant for each observation
+  int num_contestants[T]; // number of contestants for each episode
+  // vector[N] age;
+  // vector[N] plus_size;
+  // vector[N] drag_fam_competed;
+  vector[N] asian;
+  // vector[N] black;
+  vector[N] latino;
+  // vector[N] white;
+  vector[N] puerto_rican;
+  // vector[N] new_york_city;
+  vector[N] drag_house_ind;
+  // vector[N] past_lipsync;
+  // vector[N] past_wins;
+  vector[N] past_top;
+  vector[N] past_bottom;
+}
+parameters {
+  // real beta_age; 
+  // real beta_plus_size;
+  // real beta_drag_fam_competed;
+  real beta_asian;
+  // real beta_black;
+  real beta_latino;
+  // real beta_white;
+  real beta_puerto_rican;
+  // real beta_new_york_city;
+  real beta_drag_house_ind;
+  // real beta_past_lipsync;
+  // real beta_past_wins;
+  real beta_past_top;
+  real beta_past_bottom;
+  vector[I] alpha_contestant_raw;
+  real<lower=0> sigma;
+}
+transformed parameters {
+  vector[I] alpha_contestant = alpha_contestant_raw * sigma;
+}
+model {
+  // vector[N] eta = beta_age * age + beta_past_wins * past_wins + alpha_contestant[ii];
+  vector[N] eta = beta_asian * asian + beta_latino * latino + beta_puerto_rican * puerto_rican + beta_drag_house_ind * drag_house_ind + beta_past_top * past_top + beta_past_bottom * past_bottom + alpha_contestant[ii];
+  // beta_age ~ student_t(6,0,2.5);
+  // beta_plus_size ~ student_t(6,0,2.5);
+  // beta_drag_fam_competed ~ student_t(6,0,2.5);
+  beta_asian ~ student_t(6,0,2.5);
+  // beta_black ~ student_t(6,0,2.5);
+  beta_latino ~ student_t(6,0,2.5);
+  // beta_white ~ student_t(6,0,2.5);
+  beta_puerto_rican ~ student_t(6,0,2.5);
+  // beta_new_york_city ~ student_t(6,0,2.5);
+  beta_drag_house_ind ~ student_t(6,0,2.5);
+  // beta_past_lipsync ~ student_t(6,0,2.5);
+  // beta_past_wins ~ student_t(6,0,2.5);
+  beta_past_top ~ student_t(6,0,2.5);
+  beta_past_bottom ~ student_t(6,0,2.5);
+  alpha_contestant_raw ~ normal(0,1);
+  sigma ~ normal(0,1);
+  { int pos;
+  pos = 1;
+  for (t in 1:T) {
+    vector[num_contestants[t]] eta_t = segment(eta, pos, num_contestants[t]);
+    target += eta_t[1] - log_sum_exp(eta_t);
+    target += -1*eta_t[rows(eta_t)] - log_sum_exp(-1*eta_t[2:rows(eta_t)]); // remove winner (listed first)
+    pos = pos + num_contestants[t];
+  }}
+}
+```
+```{r fit, results = "hide", message = FALSE, cache = TRUE}
+fit_model <- function(df) {
+  standata <- list(
+    N = nrow(df),
+    I = max(df$contestant_id),
+    T = max(df$t),
+    ii = df$contestant_id,
+    num_contestants = (df %>% group_by(t) %>% summarise(n = n()))$n,
+    # age = df$z.age,
+    # plus_size = df$plus_size,
+    # drag_fam_competed = df$drag_fam_competed,
+    asian = df$asian,
+    # black = df$black,
+    latino = df$latino,
+    # white = df$white,
+    puerto_rican = df$puerto_rican,
+    # new_york_city = df$new_york_city,
+    drag_house_ind = df$drag_house_ind,
+    # past_lipsync = df$z.past_lipsync,
+    # past_wins = df$z.past_wins,
+    past_top = df$z.past_top,
+    past_bottom = df$z.past_bottom
+  )
+  sampling(object = model, data = standata, chains = 4, iter = 2000, control = list(adapt_delta = 0.99))
+}
+data_so_far <- wrangled %>% filter(t < next_t)
+fit <- fit_model(df = data_so_far)
+```
+```{r stan_plot}
+print(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_puerto_rican', 'beta_past_top', 'beta_past_bottom', 'sigma'))
+stan_plot(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_puerto_rican', 'beta_past_top', 'beta_past_bottom', 'sigma')) + geom_vline(xintercept=0, size = 2)
+```
+To estimate the predictive performance for new episodes we use *leave-future-out cross-validation*:
+
+```{r lfo-cv, results = "hide", message = FALSE, warning=FALSE, cache = TRUE}
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+L = 30 # always use at least L past episodes of data
+correct_win = c()
+correct_lose = c()
+random_correct = c()
+# this will take a long time!
+for (t_current in (L+1):(next_t - 1)) {
+  data_current <- wrangled %>% filter(t < t_current) # leave-future-out
+  fit_current <- fit_model(df = data_current)
+  newdata <- wrangled %>% filter(t == t_current)
+  s <- as.data.frame(fit_current) # simulations from the posterior
+  eta_s <- matrix(NA, nrow = nrow(s), ncol = nrow(newdata))
+  for (n in 1:nrow(newdata)) {
+    i = newdata$contestant_id[n]
+    if (is.element(i,data_current$contestant_id)) { # we have seen this contestant before
+      alpha_contestant_s <- s[,c(paste('alpha_contestant[',i,']',sep=''))]
+    } else { # this is a new contestant
+      alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
+    }
+    eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_puerto_rican * newdata$puerto_rican[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
+  }
+  winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
+  pred_winner <- Mode(winner_s)
+  loser_s <- apply(eta_s, MARGIN = 1, FUN = which.min)
+  pred_loser <- Mode(loser_s)
+  correct_win <- c(correct_win, (newdata$placement[pred_winner] == 1))
+  correct_lose <- c(correct_lose, (newdata$placement[pred_loser] == -1))
+  random_correct = c(random_correct, (1/nrow(newdata))*(1/(nrow(newdata)-1)))
+}
+```
+
+We get `r round(mean(correct_win)*100)`% accuracy for winners with our model. We get `r round(mean(correct_lose)*100)`% accuracy for losers with our model. A random guess gets `r round(mean(random_correct)*100)`% accuracy. Can your model do better?
+
+Sidenote: Computing leave-future-out cross-validation above took a long time. For an approximate leave-future-out cross-validation that is much faster, see [this paper](https://github.com/paul-buerkner/LFO-CV-paper/blob/master/LFO-CV.pdf).
+
+## Predict and submit
+
+Let's now use our model to predict the winner and loser of the next episode:
+
+```{r predict, results = "hide", message = FALSE, warning=FALSE, cache = TRUE}
+newdata <- wrangled %>% filter(t == next_t)
+s <- as.data.frame(fit) # simulations from the posterior
+eta_s <- matrix(NA, nrow = nrow(s), ncol = nrow(newdata))
+for (n in 1:nrow(newdata)) {
+  i = newdata$contestant_id[n]
+  if (is.element(i,data_so_far$contestant_id)) { # we have seen this contestant before
+    alpha_contestant_s <- s[,c(paste('alpha_contestant[',i,']',sep=''))]
+  } else { # this is a new contestant
+    alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
+  }
+  eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_puerto_rican * newdata$puerto_rican[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
+}
+winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
+pred_winner <- Mode(winner_s)
+loser_s <- apply(eta_s, MARGIN = 1, FUN = which.min)
+pred_loser <- Mode(loser_s)
+```
+
+We predict `r newdata$contestant_name[pred_winner]` will win and `r newdata$contestant_name[pred_loser]` will lose.
