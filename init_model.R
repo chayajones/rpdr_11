@@ -399,6 +399,13 @@ losefit17 <- glm(placement ~ asian + latino + drag_house_ind + z.past_bottom + z
 summary(losefit17)
 anova(losefit17, test = "Chisq")
 
+library(car)
+vif(winfit16)
+vif(losefit16)
+vif(winfit17)
+vif(losefit17)
+
+
 
 # for future exploration - consider adding social media info?
 # for a different model - try a cox survival analysis
