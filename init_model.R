@@ -300,7 +300,7 @@ summary(winfit13)
 anova(winfit13, test = "Chisq")
 
 
-library(BayesVarSel
+library(BayesVarSel)
 
 gibbs_fit <- GibbsBvs(placement ~ z.age + asian + black + latino + white + drag_house_ind + puerto_rican + plus_size + 
     drag_fam_competed + new_york_city + z.past_wins + z.past_top + z.past_bottom + z.past_lipsync, data = wrangled
@@ -372,6 +372,8 @@ losefit15 <- glm(placement ~ asian + latino + drag_house_ind + puerto_rican + z.
 summary(losefit15)
 anova(losefit15, test = "Chisq")
 
+
+# this model gets us to 19% accuracy for winners and 34% accuracy for losers
 winfit16 <- glm(placement ~ asian + latino + drag_house_ind + z.past_bottom + z.past_top, family = binomial(link = "logit"), 
     data = winners)
 
@@ -407,5 +409,226 @@ vif(losefit17)
 
 
 
+
+# consider adding to the model: weighting for wins and lipsyncs in top/bottom placement
+# also consider adding back in atypical episodes with more than one winner or loser
+# what about a latino variable weighted for puerto rican??
+# could pull in separately: past wins, past lipsyncs, past high, past bottom
+
+winfit18 <- glm(placement ~ z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit18)
+anova(winfit18, test = "Chisq")
+vif(winfit18)
+
+losefit18 <- glm(placement ~ z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit18)
+anova(losefit18, test = "Chisq")
+vif(losefit18)
+
+# this model gets 16% accuracy for winners and 24% accuracy for losers
+winfit19 <- glm(placement ~ asian + latino + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit19)
+anova(winfit19, test = "Chisq")
+vif(winfit19)
+
+losefit19 <- glm(placement ~ asian + latino + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit19)
+anova(losefit19, test = "Chisq")
+vif(losefit19)
+
+winfit20 <- glm(placement ~ asian + latino + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit20)
+anova(winfit20, test = "Chisq")
+vif(winfit20)
+
+losefit20 <- glm(placement ~ asian + latino + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit20)
+anova(losefit20, test = "Chisq")
+vif(losefit20)
+
+winfit21 <- glm(placement ~ drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit21)
+anova(winfit21, test = "Chisq")
+vif(winfit21)
+
+losefit21 <- glm(placement ~ drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit21)
+anova(losefit21, test = "Chisq")
+vif(losefit21)
+
+
+# this model gets 18% accuracy for winner and 31% accuracy for losers
+winfit22 <- glm(placement ~ z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit22)
+anova(winfit22, test = "Chisq")
+vif(winfit22)
+
+losefit22 <- glm(placement ~ z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit22)
+anova(losefit22, test = "Chisq")
+vif(losefit22)
+
+x_cor_win <- data.frame(placement = winners$placement, age = winners$z.age, 
+          asian = winners$asian, black = winners$black, 
+          latino = winners$latino, white = winners$white, 
+          drag_house = winners$drag_house_ind, puerto_rican = winners$puerto_rican,
+          plus_size = winners$plus_size, drag_fam = winners$drag_fam_competed, 
+          nyc = winners$new_york_city, wins = winners$z.past_wins,
+          lipsync = winners$z.past_lipsync, safe = winners$z.past_safe,
+          high = winners$z.past_high, low = winners$z.past_low)
+
+cor(x_cor_win)
+
+x_cor_lose <- data.frame(placement = losers$placement, age = losers$z.age, 
+          asian = losers$asian, black = losers$black, 
+          latino = losers$latino, white = losers$white, 
+          drag_house = losers$drag_house_ind, puerto_rican = losers$puerto_rican,
+          plus_size = losers$plus_size, drag_fam = losers$drag_fam_competed, 
+          nyc = losers$new_york_city, wins = losers$z.past_wins,
+          lipsync = losers$z.past_lipsync, safe = losers$z.past_safe,
+          high = losers$z.past_high, low = losers$z.past_low)
+
+cor(x_cor_lose)
+
+# theorize that the latino indicator from before was absorbing the effect of being puerto rican. just put puerto rican in, add back drag house indicator
+# puerto rican variable is mildly confounding for winners but weakly significant for losers
+winfit23 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit23)
+anova(winfit23, test = "Chisq")
+vif(winfit23)
+
+losefit23 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit23)
+anova(losefit23, test = "Chisq")
+vif(losefit23)
+
+
+# what happens when we take out drag house indicator
+winfit24 <- glm(placement ~ puerto_rican + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit24)
+anova(winfit24, test = "Chisq")
+vif(winfit24)
+
+losefit24 <- glm(placement ~ puerto_rican + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit24)
+anova(losefit24, test = "Chisq")
+vif(losefit24)
+
+
+# what happens when we add asian back in
+winfit25 <- glm(placement ~ asian + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit25)
+anova(winfit25, test = "Chisq")
+vif(winfit25)
+
+losefit25 <- glm(placement ~ asian + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit25)
+anova(losefit25, test = "Chisq")
+vif(losefit25)
+
+# what about taking out safe, adding back in latino
+winfit26 <- glm(placement ~ asian + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit26)
+anova(winfit26, test = "Chisq")
+vif(winfit26)
+
+losefit26 <- glm(placement ~ asian + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit26)
+anova(losefit26, test = "Chisq")
+vif(losefit26)
+
+######## try this model next
+## this model gets 13% accuracy for winners and 28% accuracy for losers
+winfit27 <- glm(placement ~ asian + latino + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit27)
+anova(winfit27, test = "Chisq")
+vif(winfit27)
+
+losefit27 <- glm(placement ~ asian + latino + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit27)
+anova(losefit27, test = "Chisq")
+vif(losefit27)
+
+winfit28 <- glm(placement ~ asian + latino + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+####
+#### this model gets 10% accuracy for winners and 26% accuracy for losers
+summary(winfit28)
+anova(winfit28, test = "Chisq")
+vif(winfit28)
+
+losefit28 <- glm(placement ~ asian + latino + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit28)
+anova(losefit28, test = "Chisq")
+vif(losefit28)
+
+###### try this model next
+winfit29 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit29)
+anova(winfit29, test = "Chisq")
+vif(winfit29)
+
+losefit29 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit29)
+anova(losefit29, test = "Chisq")
+vif(losefit29)
+
 # for future exploration - consider adding social media info?
 # for a different model - try a cox survival analysis
+
+###### model submitted for week 3:
+# glm(placement ~ asian + latino + drag_house_ind + z.past_bottom + z.past_top, family = binomial(link = "logit"), data = winners)
+# lfo cross-validation gave us 14% for winners and 27% for losers = not sure why this went down!!
+
+# was it the model that included safe that had better predictive numbers?
+# consider getting more systematic about model selection
+
+# also consider adding safe variable back in, and try this model
+# winfit27 <- glm(placement ~ asian + latino + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), data = winners)

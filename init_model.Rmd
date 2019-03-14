@@ -27,14 +27,14 @@ all_episodes <- rpdr_data %>% gs_read("all_episodes")
 all_contestants <- rpdr_data %>% gs_read("all_contestants")
 all_rankings <- rpdr_data %>% gs_read("all_rankings")
 #--------------------- add next episode to predict ---------------------#
-all_episodes_next <- add_row(all_episodes, season_number = 11, episode_number = 2,
+all_episodes_next <- add_row(all_episodes, season_number = 11, episode_number = 3,
                              episode_airdate = NA, episode_title = NA,
                              episode_type = "Competition", episode_maxi_challenge_type = NA) %>% 
   arrange(season_number, episode_number) %>% rowid_to_column("t")
 season_11_contestants <- (all_contestants %>% filter(season_number == 11))$contestant_id
 eliminated_contestants <- (all_rankings %>% filter(is.element(episode_placement,c('ELIM','Eliminated'))))$contestant_id
 next_contestants <- setdiff(season_11_contestants, eliminated_contestants)
-all_rankings_next <- add_row(all_rankings, season_number = 11, episode_number = 2, 
+all_rankings_next <- add_row(all_rankings, season_number = 11, episode_number = 3, 
                              contestant_id = next_contestants, episode_placement = NA)
 #-----------------------------------------------------------------------#
 wrangled <- all_rankings_next %>%
@@ -50,12 +50,16 @@ wrangled <- all_rankings_next %>%
   mutate(bottom = case_when(is.element(episode_placement, c('BTM2', 'LOW')) ~ 1,
                       TRUE ~ 0)) %>%     
   mutate(safe = case_when(is.element(episode_placement, c('SAFE')) ~ 1,
-                      TRUE ~ 0)) %>%                                       
+                      TRUE ~ 0)) %>% 
+  mutate(high = case_when(is.element(episode_placement, c('HIGH')) ~ 1,
+                      TRUE ~ 0)) %>%  
+  mutate(low = case_when(is.element(episode_placement, c('LOW')) ~ 1,
+                      TRUE ~ 0)) %>%                                     
   group_by(t) %>% mutate(num_winners = sum(placement == 1), 
                          num_losers = sum(placement == -1)) %>% 
   arrange(desc(placement), .by_group = TRUE) %>% ungroup() %>% # within episode: winner first, loser last
   filter(is.element(episode_type,c('Competition','Finale'))) %>%
-  filter((num_winners == 1 & num_losers == 1) | t == max(t)) %>% # use data on typical episodes
+  # filter((num_winners == 1 & num_losers == 1) | t == max(t)) %>% # use data on typical episodes - taking this out for now
   filter(!is.element(episode_placement,c('Guest','Miss C')) | t == max(t)) %>% # use data on typical contestants
   group_by(contestant_id) %>% 
     mutate(past_wins = cumsum(placement == 1) - (placement == 1)) %>%
@@ -63,15 +67,19 @@ wrangled <- all_rankings_next %>%
     mutate(past_top = cumsum(top == 1) - (top == 1)) %>%
     mutate(past_bottom = cumsum(bottom == 1) - (bottom == 1)) %>%
     mutate(past_safe = cumsum(safe == 1) - (safe == 1)) %>%
+    mutate(past_high = cumsum(high == 1) - (high == 1)) %>%
+    mutate(past_low = cumsum(low == 1) - (low == 1)) %>%
   ungroup() %>%
   mutate(z.past_wins = (past_wins - mean(past_wins))/(2*sd(past_wins))) %>%
   mutate(z.past_lipsync = (past_lipsync - mean(past_lipsync, na.rm = TRUE))/(2*sd(past_lipsync, na.rm = TRUE))) %>%
   mutate(z.past_top = (past_top - mean(past_top, na.rm = TRUE))/(2*sd(past_top, na.rm = TRUE))) %>%
   mutate(z.past_bottom = (past_bottom - mean(past_bottom, na.rm = TRUE))/(2*sd(past_bottom, na.rm = TRUE))) %>%
   mutate(z.past_safe = (past_safe - mean(past_safe, na.rm = TRUE))/(2*sd(past_safe, na.rm = TRUE))) %>%
+  mutate(z.past_high = (past_high - mean(past_high, na.rm = TRUE))/(2*sd(past_high, na.rm = TRUE))) %>%
+  mutate(z.past_low = (past_low - mean(past_low, na.rm = TRUE))/(2*sd(past_low, na.rm = TRUE))) %>%
   mutate(z.age = (age - mean(age))/(2*sd(age))) %>%
   select(season_number, episode_number, t, contestant_id, contestant_name, # identifiers
-         ethnicity, asian, black, latino, white, z.age, z.past_wins, z.past_lipsync, z.past_top, z.past_safe, z.past_bottom, plus_size, drag_house_ind, drag_fam_competed, puerto_rican, new_york_city, # x variables
+         ethnicity, asian, black, latino, white, drag_house_ind, z.age, z.past_wins, z.past_lipsync, z.past_top, z.past_safe, z.past_bottom, z.past_high, z.past_low, plus_size, drag_fam_competed, puerto_rican, new_york_city, # x variables
          placement, num_winners, num_losers) # episode outcomes
 # renumber episodes skipping the atypical ones:
 wrangled$t <- as.numeric(as.factor(wrangled$t))
@@ -106,36 +114,42 @@ data {
   int T; // number of episodes
   int<lower=1,upper=I> ii[N]; // contestant for each observation
   int num_contestants[T]; // number of contestants for each episode
-  // vector[N] age;
-  // vector[N] plus_size;
-  // vector[N] drag_fam_competed;
+  vector[N] age;
+  vector[N] plus_size;
+  vector[N] drag_fam_competed;
   vector[N] asian;
-  // vector[N] black;
+  vector[N] black;
   vector[N] latino;
-  // vector[N] white;
-  // vector[N] puerto_rican;
-  // vector[N] new_york_city;
+  vector[N] white;
+  vector[N] puerto_rican;
+  vector[N] new_york_city;
   vector[N] drag_house_ind;
-  // vector[N] past_lipsync;
-  // vector[N] past_wins;
+  vector[N] past_lipsync;
+  vector[N] past_wins;
   vector[N] past_top;
-  vector[N] past_bottom;
+  vector[N] past_bottom; 
+  vector[N] past_high;
+  vector[N] past_low;
+  vector[N] past_safe;
 }
 parameters {
-  // real beta_age; 
-  // real beta_plus_size;
-  // real beta_drag_fam_competed;
+  real beta_age; 
+  real beta_plus_size;
+  real beta_drag_fam_competed;
   real beta_asian;
-  // real beta_black;
+  real beta_black;
   real beta_latino;
-  // real beta_white;
-  // real beta_puerto_rican;
-  // real beta_new_york_city;
+  real beta_white;
+  real beta_puerto_rican;
+  real beta_new_york_city;
   real beta_drag_house_ind;
-  // real beta_past_lipsync;
-  // real beta_past_wins;
+  real beta_past_lipsync;
+  real beta_past_wins;
   real beta_past_top;
   real beta_past_bottom;
+  real beta_past_high;
+  real beta_past_low;
+  real beta_past_safe;
   vector[I] alpha_contestant_raw;
   real<lower=0> sigma;
 }
@@ -144,21 +158,27 @@ transformed parameters {
 }
 model {
   // vector[N] eta = beta_age * age + beta_past_wins * past_wins + alpha_contestant[ii];
+  // beta_asian * asian + beta_latino * latino + 
+  // vector[N] eta = beta_asian * asian + beta_latino * latino + beta_drag_house_ind * drag_house_ind + beta_past_high * past_high + beta_past_low * past_low + beta_past_lipsync * past_lipsync + beta_past_wins * past_wins + alpha_contestant[ii];
+  // vector[N] eta = beta_past_high * past_high + beta_past_low * past_low + beta_past_lipsync * past_lipsync + beta_past_safe * past_safe + beta_past_wins * past_wins + alpha_contestant[ii];
   vector[N] eta = beta_asian * asian + beta_latino * latino + beta_drag_house_ind * drag_house_ind + beta_past_top * past_top + beta_past_bottom * past_bottom + alpha_contestant[ii];
-  // beta_age ~ student_t(6,0,2.5);
-  // beta_plus_size ~ student_t(6,0,2.5);
-  // beta_drag_fam_competed ~ student_t(6,0,2.5);
+  beta_age ~ student_t(6,0,2.5);
+  beta_plus_size ~ student_t(6,0,2.5);
+  beta_drag_fam_competed ~ student_t(6,0,2.5);
   beta_asian ~ student_t(6,0,2.5);
-  // beta_black ~ student_t(6,0,2.5);
+  beta_black ~ student_t(6,0,2.5);
   beta_latino ~ student_t(6,0,2.5);
-  // beta_white ~ student_t(6,0,2.5);
-  // beta_puerto_rican ~ student_t(6,0,2.5);
-  // beta_new_york_city ~ student_t(6,0,2.5);
+  beta_white ~ student_t(6,0,2.5);
+  beta_puerto_rican ~ student_t(6,0,2.5);
+  beta_new_york_city ~ student_t(6,0,2.5);
   beta_drag_house_ind ~ student_t(6,0,2.5);
-  // beta_past_lipsync ~ student_t(6,0,2.5);
-  // beta_past_wins ~ student_t(6,0,2.5);
+  beta_past_lipsync ~ student_t(6,0,2.5);
+  beta_past_wins ~ student_t(6,0,2.5);
   beta_past_top ~ student_t(6,0,2.5);
   beta_past_bottom ~ student_t(6,0,2.5);
+  beta_past_high ~ student_t(6,0,2.5);
+  beta_past_low ~ student_t(6,0,2.5);
+  beta_past_safe ~ student_t(6,0,2.5);
   alpha_contestant_raw ~ normal(0,1);
   sigma ~ normal(0,1);
   { int pos;
@@ -179,18 +199,21 @@ fit_model <- function(df) {
     T = max(df$t),
     ii = df$contestant_id,
     num_contestants = (df %>% group_by(t) %>% summarise(n = n()))$n,
-    # age = df$z.age,
-    # plus_size = df$plus_size,
-    # drag_fam_competed = df$drag_fam_competed,
+    age = df$z.age,
+    plus_size = df$plus_size,
+    drag_fam_competed = df$drag_fam_competed,
     asian = df$asian,
-    # black = df$black,
+    black = df$black,
     latino = df$latino,
-    # white = df$white,
-    # puerto_rican = df$puerto_rican,
-    # new_york_city = df$new_york_city,
+    white = df$white,
+    puerto_rican = df$puerto_rican,
+    new_york_city = df$new_york_city,
     drag_house_ind = df$drag_house_ind,
-    # past_lipsync = df$z.past_lipsync,
-    # past_wins = df$z.past_wins,
+    past_lipsync = df$z.past_lipsync,
+    past_wins = df$z.past_wins,
+    past_high = df$z.past_high,
+    past_low = df$z.past_low,
+    past_safe = df$z.past_safe,
     past_top = df$z.past_top,
     past_bottom = df$z.past_bottom
   )
@@ -200,6 +223,7 @@ data_so_far <- wrangled %>% filter(t < next_t)
 fit <- fit_model(df = data_so_far)
 ```
 ```{r stan_plot}
+# 'beta_asian', 'beta_latino', 
 print(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_past_top', 'beta_past_bottom', 'sigma'))
 stan_plot(fit, pars = c('beta_asian', 'beta_latino', 'beta_drag_house_ind', 'beta_past_top', 'beta_past_bottom', 'sigma')) + geom_vline(xintercept=0, size = 2)
 ```
@@ -215,6 +239,7 @@ correct_win = c()
 correct_lose = c()
 random_correct = c()
 # this will take a long time!
+# s$beta_asian * newdata$asian + s$beta_latino * newdata$latino + 
 for (t_current in (L+1):(next_t - 1)) {
   data_current <- wrangled %>% filter(t < t_current) # leave-future-out
   fit_current <- fit_model(df = data_current)
@@ -228,7 +253,7 @@ for (t_current in (L+1):(next_t - 1)) {
     } else { # this is a new contestant
       alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
     }
-    eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
+    eta_s[,n] <- s$beta_asian * newdata$asian + s$beta_latino * newdata$latino + s$beta_drag_house_ind * newdata$drag_house_ind + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
   }
   winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
   pred_winner <- Mode(winner_s)
@@ -249,6 +274,10 @@ Sidenote: Computing leave-future-out cross-validation above took a long time. Fo
 Let's now use our model to predict the winner and loser of the next episode:
 
 ```{r predict, results = "hide", message = FALSE, warning=FALSE, cache = TRUE}
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 newdata <- wrangled %>% filter(t == next_t)
 s <- as.data.frame(fit) # simulations from the posterior
 eta_s <- matrix(NA, nrow = nrow(s), ncol = nrow(newdata))
@@ -259,7 +288,7 @@ for (n in 1:nrow(newdata)) {
   } else { # this is a new contestant
     alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
   }
-  eta_s[,n] <- s$beta_asian * newdata$asian[n] + s$beta_latino * newdata$latino[n] + s$beta_drag_house_ind * newdata$drag_house_ind[n] + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
+  eta_s[,n] <- s$beta_asian * newdata$asian + s$beta_latino * newdata$latino + s$beta_drag_house_ind * newdata$drag_house_ind + s$beta_past_top * newdata$z.past_top[n] + s$beta_past_bottom * newdata$z.past_bottom[n] + alpha_contestant_s
 }
 winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
 pred_winner <- Mode(winner_s)
