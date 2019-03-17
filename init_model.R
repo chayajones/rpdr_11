@@ -626,9 +626,12 @@ vif(losefit29)
 ###### model submitted for week 3:
 # glm(placement ~ asian + latino + drag_house_ind + z.past_bottom + z.past_top, family = binomial(link = "logit"), data = winners)
 # lfo cross-validation gave us 14% for winners and 27% for losers = not sure why this went down!!
+# went down because we added back in the atypical episodes where there was more than one winner or loser
 
 # was it the model that included safe that had better predictive numbers?
 # consider getting more systematic about model selection
 
 # also consider adding safe variable back in, and try this model
 # winfit27 <- glm(placement ~ asian + latino + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), data = winners)
+
+# ^^ try that model, and also try without puerto_rican with the atypical episodes
