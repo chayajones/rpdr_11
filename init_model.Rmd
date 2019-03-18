@@ -158,10 +158,7 @@ transformed parameters {
 }
 model {
   // vector[N] eta = beta_age * age + beta_past_wins * past_wins + alpha_contestant[ii];
-  // beta_asian * asian + beta_latino * latino + 
-  vector[N] eta = beta_asian * asian + beta_latino * latino + beta_puerto_rican * puerto_rican + beta_drag_house_ind * drag_house_ind + beta_past_high * past_high + beta_past_low * past_low + beta_past_lipsync * past_lipsync + beta_past_wins * past_wins + alpha_contestant[ii];
-  // vector[N] eta = beta_past_high * past_high + beta_past_low * past_low + beta_past_lipsync * past_lipsync + beta_past_safe * past_safe + beta_past_wins * past_wins + alpha_contestant[ii];
-  // vector[N] eta = beta_asian * asian + beta_latino * latino + beta_drag_house_ind * drag_house_ind + beta_past_top * past_top + beta_past_bottom * past_bottom + alpha_contestant[ii];
+  vector[N] eta = beta_puerto_rican * puerto_rican + beta_drag_house_ind * drag_house_ind + beta_past_high * past_high + beta_past_low * past_low + beta_past_safe * past_safe + beta_past_lipsync * past_lipsync + beta_past_wins * past_wins + alpha_contestant[ii];
   beta_age ~ student_t(6,0,2.5);
   beta_plus_size ~ student_t(6,0,2.5);
   beta_drag_fam_competed ~ student_t(6,0,2.5);
@@ -224,8 +221,8 @@ fit <- fit_model(df = data_so_far)
 ```
 ```{r stan_plot}
 # 'beta_asian', 'beta_latino', 
-print(fit, pars = c('beta_asian', 'beta_latino', 'beta_puerto_rican', 'beta_drag_house_ind', 'beta_past_wins', 'beta_past_lipsync', 'beta_past_high', 'beta_past_low', 'sigma'))
-stan_plot(fit, pars = c('beta_asian', 'beta_latino', 'beta_puerto_rican', 'beta_drag_house_ind', 'beta_past_wins', 'beta_past_lipsync', 'beta_past_high', 'beta_past_low', 'sigma')) + geom_vline(xintercept=0, size = 2)
+print(fit, pars = c('beta_puerto_rican', 'beta_drag_house_ind', 'beta_past_wins', 'beta_past_lipsync', 'beta_past_safe', 'beta_past_high', 'beta_past_low', 'sigma'))
+stan_plot(fit, pars = c('beta_puerto_rican', 'beta_drag_house_ind', 'beta_past_wins', 'beta_past_lipsync', 'beta_past_safe', 'beta_past_high', 'beta_past_low', 'sigma')) + geom_vline(xintercept=0, size = 2)
 ```
 To estimate the predictive performance for new episodes we use *leave-future-out cross-validation*:
 
@@ -253,7 +250,7 @@ for (t_current in (L+1):(next_t - 1)) {
     } else { # this is a new contestant
       alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
     }
-    eta_s[,n] <- s$beta_asian * newdata$asian + s$beta_latino * newdata$latino + s$beta_puerto_rican * newdata$puerto_rican + s$beta_drag_house_ind * newdata$drag_house_ind + s$beta_past_high * newdata$z.past_high[n] + s$beta_past_low * newdata$z.past_low[n] + s$beta_past_wins * newdata$z.past_wins[n] + s$beta_past_lipsync * newdata$z.past_lipsync[n] + alpha_contestant_s
+    eta_s[,n] <- s$beta_puerto_rican * newdata$puerto_rican + s$beta_drag_house_ind * newdata$drag_house_ind + s$beta_past_high * newdata$z.past_high[n] + s$beta_past_low * newdata$z.past_low[n] + s$beta_past_safe * newdata$z.past_safe[n] + s$beta_past_wins * newdata$z.past_wins[n] + s$beta_past_lipsync * newdata$z.past_lipsync[n] + alpha_contestant_s
   }
   winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
   pred_winner <- Mode(winner_s)
@@ -274,6 +271,7 @@ Sidenote: Computing leave-future-out cross-validation above took a long time. Fo
 Let's now use our model to predict the winner and loser of the next episode:
 
 ```{r predict, results = "hide", message = FALSE, warning=FALSE, cache = TRUE}
+
 Mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
@@ -288,12 +286,13 @@ for (n in 1:nrow(newdata)) {
   } else { # this is a new contestant
     alpha_contestant_s <- rnorm(n = nrow(s), mean = 0, sd = s$sigma)
   }
-  eta_s[,n] <- s$beta_asian * newdata$asian + s$beta_latino * newdata$latino + s$beta_puerto_rican * newdata$puerto_rican + s$beta_drag_house_ind * newdata$drag_house_ind + s$beta_past_high * newdata$z.past_high[n] + s$beta_past_low * newdata$z.past_low[n] + s$beta_past_wins * newdata$z.past_wins[n] + s$beta_past_lipsync * newdata$z.past_lipsync[n] + alpha_contestant_s
+  eta_s[,n] <- s$beta_puerto_rican * newdata$puerto_rican + s$beta_drag_house_ind * newdata$drag_house_ind + s$beta_past_high * newdata$z.past_high[n] + s$beta_past_low * newdata$z.past_low[n] + s$beta_past_safe * newdata$z.past_safe[n] + s$beta_past_wins * newdata$z.past_wins[n] + s$beta_past_lipsync * newdata$z.past_lipsync[n] + alpha_contestant_s
 }
 winner_s <- apply(eta_s, MARGIN = 1, FUN = which.max)
 pred_winner <- Mode(winner_s)
 loser_s <- apply(eta_s, MARGIN = 1, FUN = which.min)
 pred_loser <- Mode(loser_s)
+
 ```
 
 We predict `r newdata$contestant_name[pred_winner]` will win and `r newdata$contestant_name[pred_loser]` will lose.

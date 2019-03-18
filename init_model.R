@@ -635,3 +635,14 @@ vif(losefit29)
 # winfit27 <- glm(placement ~ asian + latino + puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), data = winners)
 
 # ^^ try that model, and also try without puerto_rican with the atypical episodes
+
+# 3/17:
+# including week 3 data, with atypical episodes:
+# asian + latino + drag_house_ind + z.past_wins + z.past_lipsync + z.past_high + z.past_low
+# 11% winners and 28% losers 
+
+# 3/17:
+# including week 3 data, with atypical episodes:
+# puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low
+# 17% winners and 29% losers 
+# predicts vanjie to win and mercedes to lose week 4
