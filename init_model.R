@@ -648,7 +648,10 @@ vif(losefit29)
 # predicts vanjie to win and mercedes to lose week 4
 
 
+# 3/25:
+# including week 4 data, with atypical episodes:
+# puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low
+# X% winners and X% losers 
+# predicts xxx to win and xxx to lose week 5
 
 
-
-# \eta_{it}\ =\ \beta_\text{asian}\ \text{asian}_i\ +\ \beta_\text{latino}\ \text{latino}_i\ +\ \beta_\text{drag_house_ind}\ \text{drag_house_ind}_i\ +\ \beta_\text{past_bottom}\ \text{past_bottom}_i\ +\ \beta_\text{past_top}\ \text{past_top}_{it}\ +\ \alpha_i\ \ \ \text{\ for\ }\ i\ \text{\ playing\ in\ episode\ }\ t
