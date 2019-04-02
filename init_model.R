@@ -651,7 +651,90 @@ vif(losefit29)
 # 3/25:
 # including week 4 data, with atypical episodes:
 # puerto_rican + drag_house_ind + z.past_wins + z.past_lipsync + z.past_safe + z.past_high + z.past_low
-# X% winners and X% losers 
-# predicts xxx to win and xxx to lose week 5
+# 13% winners and 30% losers 
+# predicts silky nutmeg ganache to win and rajah o'hara to lose week 5
+# suspect model is weighting silky's "safe" placements too heavily
+
+# 3/30
+# including week 5 data
+
+# trying aggregating high + safe since they have similar coefficients
+# queens all have a more even distribution of "safe" placements now so this is less necessary
+# models that include "win" placements are weighting brooke lynn hytes' wins too heavily
+# this is a particularly weird and fascinating effect since the coefficient is close to zero and has a wide CI
+# even weirder: taking wins out, brooke lynn is still predicted to win... whyyyyyy
+# so what does it mean to have better or worse accuracy if all the models predict the same outcome
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_high + z.past_wins
+# 13% winners and 32% losers
+# predicts brooke lynn hytes to win and rajah o'hara to lose week 6
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_high + z.past_wins
+# 11% winners and 27% losers
+# predicts brooke lynn hytes to win and rajah o'hara to lose week 6
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_high_safe + z.past_wins
+# 13% winners and 27% losers
+# predicts brooke lynn hytes to win and rajah o'hara to lose week 6
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_high
+# 12% winners and 31% losers
+# predicts brooke lynn hytes to win and rajah o'hara to lose week 6
 
 
+winfit30 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit30)
+anova(winfit30, test = "Chisq")
+vif(winfit30)
+
+losefit30 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_high + z.past_low, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit30)
+anova(losefit30, test = "Chisq")
+vif(losefit30)
+
+
+winfit31 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_high + z.past_low + z.past_safe, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit31)
+anova(winfit31, test = "Chisq")
+vif(winfit31)
+
+losefit31 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_high + z.past_low + z.past_safe, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit31)
+anova(losefit31, test = "Chisq")
+vif(losefit31)
+
+winfit32 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_low + z.past_high_safe, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit32)
+anova(winfit32, test = "Chisq")
+vif(winfit32)
+
+losefit32 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_wins + z.past_lipsync + z.past_low + z.past_high_safe, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit32)
+anova(losefit32, test = "Chisq")
+vif(losefit32)
+
+winfit33 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_lipsync + z.past_low + z.past_safe + z.past_high, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit33)
+anova(winfit33, test = "Chisq")
+vif(winfit33)
+
+losefit33 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_lipsync + z.past_low + z.past_safe + z.past_high, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit33)
+anova(losefit33, test = "Chisq")
+vif(losefit33)
