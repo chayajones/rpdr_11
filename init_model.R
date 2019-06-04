@@ -303,7 +303,7 @@ anova(winfit13, test = "Chisq")
 library(BayesVarSel)
 
 gibbs_fit <- GibbsBvs(placement ~ z.age + asian + black + latino + white + drag_house_ind + puerto_rican + plus_size + 
-    drag_fam_competed + new_york_city + z.past_wins + z.past_top + z.past_bottom + z.past_lipsync, data = wrangled
+    drag_fam_competed + new_york_city + z.past_wins + z.past_top + z.past_bottom + z.past_lipsync, data = wrangled)
 
 bayes_fit <- Bvs(placement ~ z.age + asian + black + latino + white + drag_house_ind + puerto_rican + plus_size + 
     drag_fam_competed + new_york_city + z.past_wins + z.past_top + z.past_bottom + z.past_lipsync, data = wrangled)
@@ -738,3 +738,162 @@ losefit33 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_lipsync + z.
 summary(losefit33)
 anova(losefit33, test = "Chisq")
 vif(losefit33)
+
+# 4/10
+# week 6 data included in set
+# model as is still predicts brooke lynn hytes to win and ra'jah o'hara to lose
+# suspect the coefficient for the individual contestants has too strong of a prior 
+# trying the model without the multi-level modeling:
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_high_safe (NO alpha_contestant)
+# 27% winners 22% losers
+# predicts yvie oddly to win and ra'jah to lose week 7
+# used this for week 7 predictions, curious about the other models (run them with next week's data?)
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_high + z.past_wins (NO alpha_contestant)
+# X% winners and X% losers
+# predicts XX to win and XX to lose week 7
+
+
+# if time, also try existing model but with weakly informative prior (same sigma though)
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_high_safe  --  alpha_contestant_raw ~ normal(0, 1e6); sigma ~ normal(0, 1);
+
+
+# 4/16
+# week 7 data included in set
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_high_safe (NO alpha_contestant)
+# XX% winners XX% losers
+# predicts yvie oddly to win and shuga to lose week 8
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_high_safe  --  alpha_contestant_raw ~ normal(0, 1e6); sigma ~ normal(0, 1);
+# XX% winners XX% losers
+# predicts brooke lynn hytes to win and shuga to lose week 8
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_high + z.past_wins (NO alpha_contestant)
+# 25% winners and 26% losers
+# predicts yvie oddly to win and shuga to lose week 8
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top + alpha_contestant
+# 
+# predicts brooke lynn hytes to win and shuga to lose week 8
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (NO alpha_contestant)
+# 
+# predicts yvie to win and shuga to lose week 8
+
+winfit34 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_lipsync + z.past_low + z.past_safe + z.past_top, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit34)
+anova(winfit34, test = "Chisq")
+vif(winfit34)
+
+losefit34 <- glm(placement ~ drag_house_ind + puerto_rican + z.past_lipsync + z.past_low + z.past_safe + z.past_top, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit34)
+anova(losefit34, test = "Chisq")
+vif(losefit34)
+
+# 4/24
+# week 8 data included in set
+#  OMG THE EPISODE 3 DATA HAS BEEN WRONG ALL THIS TIME
+# weirdly that hasn't really changed the model's predictions
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (NO alpha_contestant)
+# 
+# predicts silky to win and akeria to lose week 9
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_high + z.past_wins (WITH alpha_contestant)
+# 
+# predicts silky to win and yvie to lose week 9
+
+# changing the alpha back to a half-normal distribution
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (WITH alpha_contestant)
+# 
+# predicts silky to win and shuga to lose week 9
+
+# 4/29
+# week 9 data included in set
+
+# changing the alpha back to a half-normal distribution
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (WITH alpha_contestant)
+# 
+# predicts silky to win and shuga to lose week 10
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (NO alpha_contestant)
+# 
+# predicts silky to win and akeria to lose week 10
+
+# what if we add age back in?
+# puerto_rican + drag_house_ind + age + z.past_lipsync + z.past_low + z.past_safe + z.past_top (NO alpha_contestant)
+# 
+# predicts silky to win and akeria to lose week 10
+
+winners <- wrangled %>% filter(placement != -1)
+
+losers <- wrangled %>% filter(placement != 1)
+
+losers$placement <- losers$placement *-1
+
+winfit88 <- glm(placement ~ drag_house_ind + puerto_rican + z.age + plus_size + drag_fam_competed + asian + black + new_york_city + z.past_lipsync + z.past_low + z.past_safe + z.past_high + z.past_wins, family = binomial(link = "logit"), 
+    data = winners)
+
+summary(winfit88)
+anova(winfit88, test = "Chisq")
+vif(winfit88)
+
+losefit88 <- glm(placement ~ drag_house_ind + puerto_rican + z.age + plus_size + drag_fam_competed + asian + black + new_york_city + z.past_lipsync + z.past_low + z.past_safe + z.past_high + z.past_wins, family = binomial(link = "logit"), 
+    data = losers)
+
+summary(losefit88)
+anova(losefit88, test = "Chisq")
+vif(losefit88)
+
+# possibly some mega-typos in my previous models that may have impacted predictions?  
+# in the LFO and prediction sections was missing [n] on many, many variables - 
+# try a couple of those models again now that things are fixed and see what happens
+
+# kitchen sink model ^ winfit88 above
+# predicts silky to win and shuga to lose week 10
+
+# rerun: puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (NO alpha_contestant)
+# predicts silky to win and shuga to lose week 10
+
+# don't think my typos were affecting the model, or at least not much
+
+# 5/6/19
+# week 10 data included in set
+# turns out last week's prediction was missing week 9 data, but then predicted shuga correctly so fine whatever
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (NO alpha_contestant)
+# predicts silky to win and vanjie to lose week 11
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (WITH alpha_contestant)
+# 
+# predicts silky to win and vanjie to lose week 11
+
+
+# an interesting idea for the future: once you get 5+ episodes in, can you do trend analysis?  
+# what is the micro trend for each queen, is silky on a losing streak or whatever
+
+
+# 5/13/19
+# week 11 data included in set
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (WITH alpha_contestant)
+# 
+# predicts brooke lynn to win and vanjie to lose week 12 WHAT A SHOW THAT WOULD BE
+
+# 5/29/19
+# week 12 data included in set
+# telling the model we're predicting for episode 13 just so it doesn't get confused even though ep 13 was the reunion
+
+# puerto_rican + drag_house_ind + z.past_lipsync + z.past_low + z.past_safe + z.past_top (WITH alpha_contestant)
+#
+# predicts akeria to win and brooke lynn to lose (but nobody really loses the finals)
+# i don't even know what to think about that
+
+# kitchen sink model (no alpha)
+# predicts akeria to win and brooke lynn to lose
